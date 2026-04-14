@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import Animated, {
   runOnJS,
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -17,7 +16,7 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from "react-native-reanimated";
-import { PanGestureHandler } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
@@ -48,12 +47,12 @@ export function RestaurantCard({ restaurant, onSwipe, isTop, index }: Props) {
     onSwipe(liked);
   };
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onActive: (event) => {
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
       translateX.value = event.translationX;
       translateY.value = event.translationY * 0.4;
-    },
-    onEnd: (event) => {
+    })
+    .onEnd((event) => {
       if (event.translationX > SWIPE_THRESHOLD) {
         translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
         runOnJS(triggerSwipe)(true);
@@ -64,8 +63,7 @@ export function RestaurantCard({ restaurant, onSwipe, isTop, index }: Props) {
         translateX.value = withSpring(0, { damping: 15 });
         translateY.value = withSpring(0, { damping: 15 });
       }
-    },
-  });
+    });
 
   const cardStyle = useAnimatedStyle(() => {
     const rotate = interpolate(
@@ -115,7 +113,7 @@ export function RestaurantCard({ restaurant, onSwipe, isTop, index }: Props) {
   }
 
   return (
-    <PanGestureHandler onGestureEvent={gestureHandler} enabled={isTop}>
+    <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.card, cardStyle, { backgroundColor: colors.card, zIndex: 10 }]}>
         <Image source={{ uri: restaurant.photo }} style={styles.image} resizeMode="cover" />
 
@@ -159,7 +157,7 @@ export function RestaurantCard({ restaurant, onSwipe, isTop, index }: Props) {
           </Text>
         </View>
       </Animated.View>
-    </PanGestureHandler>
+    </GestureDetector>
   );
 }
 
