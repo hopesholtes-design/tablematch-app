@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect } from "react";
 import {
   Dimensions,
+  Image,
+  Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -31,6 +34,7 @@ export default function SwipeScreen() {
     restaurants,
     currentIndex,
     matchedRestaurant,
+    allMatches,
     connectionStatus,
     partnerSwiping,
     swipe,
@@ -101,7 +105,17 @@ export default function SwipeScreen() {
           </Text>
         </View>
 
-        <View style={{ width: 24 }} />
+        {/* Match count badge */}
+        <View style={styles.matchBadgeContainer}>
+          {allMatches.length > 0 ? (
+            <View style={[styles.matchBadge, { backgroundColor: "#FF6B6B" }]}>
+              <Ionicons name="heart" size={11} color="#fff" />
+              <Text style={styles.matchBadgeText}>{allMatches.length}</Text>
+            </View>
+          ) : (
+            <View style={{ width: 24 }} />
+          )}
+        </View>
       </View>
 
       {/* Partner activity indicator */}
@@ -114,17 +128,16 @@ export default function SwipeScreen() {
         </View>
       )}
 
-      {/* Cards area */}
-      <View style={styles.cardsArea}>
-        {isEnd ? (
-          <View style={styles.centerState}>
-            <Ionicons name="restaurant-outline" size={48} color={colors.mutedForeground} />
-            <Text style={[styles.stateTitle, { color: colors.foreground }]}>All done!</Text>
-            <Text style={[styles.stateSubtitle, { color: colors.mutedForeground }]}>
-              You've seen all nearby restaurants.
-            </Text>
-          </View>
-        ) : isWaiting ? (
+      {/* Cards / End / Waiting area */}
+      {isEnd ? (
+        <EndScreen
+          allMatches={allMatches}
+          colors={colors}
+          insets={insets}
+          onNewSession={async () => { await disconnect(); router.replace("/"); }}
+        />
+      ) : isWaiting ? (
+        <View style={styles.cardsArea}>
           <View style={styles.centerState}>
             <Ionicons name="people-outline" size={48} color={colors.primary} />
             <Text style={[styles.stateTitle, { color: colors.foreground }]}>Waiting for partner</Text>
@@ -132,8 +145,10 @@ export default function SwipeScreen() {
               They need to join with your session code.
             </Text>
           </View>
-        ) : (
-          [...visibleCards].reverse().map((restaurant, reverseIdx) => {
+        </View>
+      ) : (
+        <View style={styles.cardsArea}>
+          {[...visibleCards].reverse().map((restaurant, reverseIdx) => {
             const actualIdx = visibleCards.length - 1 - reverseIdx;
             return (
               <RestaurantCard
@@ -144,9 +159,9 @@ export default function SwipeScreen() {
                 index={actualIdx}
               />
             );
-          })
-        )}
-      </View>
+          })}
+        </View>
+      )}
 
       {/* Progress */}
       {!isEnd && !isWaiting && restaurants.length > 0 && (
@@ -184,7 +199,7 @@ export default function SwipeScreen() {
         </View>
       )}
 
-      {/* Match modal */}
+      {/* Match popup (still works as before) */}
       {matchedRestaurant && (
         <MatchModal
           restaurant={matchedRestaurant}
@@ -192,6 +207,95 @@ export default function SwipeScreen() {
         />
       )}
     </View>
+  );
+}
+
+// ── End screen with match history ──────────────────────────────────────────
+
+type Colors = ReturnType<typeof useColors>;
+
+interface EndScreenProps {
+  allMatches: ReturnType<typeof useSession>["allMatches"];
+  colors: Colors;
+  insets: { top: number; bottom: number };
+  onNewSession: () => void;
+}
+
+function EndScreen({ allMatches, colors, insets, onNewSession }: EndScreenProps) {
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={[
+        styles.endContent,
+        {
+          paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80,
+        },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Hero */}
+      <View style={styles.endHero}>
+        <View style={[styles.endIconBg, { backgroundColor: allMatches.length ? "#FF6B6B15" : colors.secondary }]}>
+          <Ionicons
+            name={allMatches.length ? "heart" : "restaurant-outline"}
+            size={40}
+            color={allMatches.length ? "#FF6B6B" : colors.mutedForeground}
+          />
+        </View>
+        <Text style={[styles.endTitle, { color: colors.foreground }]}>
+          {allMatches.length ? "You matched!" : "All done!"}
+        </Text>
+        <Text style={[styles.endSubtitle, { color: colors.mutedForeground }]}>
+          {allMatches.length
+            ? `${allMatches.length} restaurant${allMatches.length > 1 ? "s" : ""} you both liked`
+            : "No matches yet — try swiping again with different filters."}
+        </Text>
+      </View>
+
+      {/* Match list */}
+      {allMatches.length > 0 && (
+        <View style={styles.matchList}>
+          {allMatches.map((r, i) => (
+            <TouchableOpacity
+              key={r.id}
+              style={[styles.matchRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => Linking.openURL(r.mapsLink).catch(() => null)}
+              activeOpacity={0.82}
+            >
+              <View style={styles.matchRowNumber}>
+                <Text style={[styles.matchRowNumberText, { color: colors.mutedForeground }]}>{i + 1}</Text>
+              </View>
+              <Image source={{ uri: r.photo }} style={styles.matchRowImage} />
+              <View style={styles.matchRowInfo}>
+                <Text style={[styles.matchRowName, { color: colors.foreground }]} numberOfLines={1}>
+                  {r.name}
+                </Text>
+                <Text style={[styles.matchRowMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {r.cuisine} · {r.price}
+                </Text>
+                <View style={styles.matchRowRating}>
+                  <Ionicons name="star" size={12} color="#FFB800" />
+                  <Text style={[styles.matchRowRatingText, { color: colors.mutedForeground }]}>
+                    {r.rating.toFixed(1)}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="map-outline" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* New session button */}
+      <TouchableOpacity
+        style={[styles.newSessionBtn, { borderColor: colors.border, backgroundColor: colors.secondary }]}
+        onPress={onNewSession}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="refresh-outline" size={18} color={colors.foreground} />
+        <Text style={[styles.newSessionText, { color: colors.foreground }]}>New Session</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -225,6 +329,24 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
+  },
+  matchBadgeContainer: {
+    width: 36,
+    alignItems: "flex-end",
+  },
+  matchBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  matchBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
   },
   partnerBanner: {
     flexDirection: "row",
@@ -295,5 +417,100 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#FF6B6B25",
+  },
+  // End screen
+  endContent: {
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    gap: 24,
+    alignItems: "center",
+  },
+  endHero: {
+    alignItems: "center",
+    gap: 10,
+  },
+  endIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  endTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  endSubtitle: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 280,
+  },
+  matchList: {
+    width: "100%",
+    gap: 10,
+  },
+  matchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+  },
+  matchRowNumber: {
+    width: 22,
+    alignItems: "center",
+  },
+  matchRowNumberText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  matchRowImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+  },
+  matchRowInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  matchRowName: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
+  },
+  matchRowMeta: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  matchRowRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  matchRowRatingText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  newSessionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginTop: 4,
+  },
+  newSessionText: {
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
   },
 });

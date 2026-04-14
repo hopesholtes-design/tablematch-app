@@ -27,6 +27,7 @@ interface SessionState {
   restaurants: Restaurant[];
   currentIndex: number;
   matchedRestaurant: Restaurant | null;
+  allMatches: Restaurant[];
   connectionStatus: ConnectionStatus;
   userCount: number;
   partnerSwiping: boolean;
@@ -44,20 +45,23 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 
 const SOCKET_URL = `https://${process.env["EXPO_PUBLIC_DOMAIN"]}`;
 
+const INITIAL_STATE: SessionState = {
+  sessionId: null,
+  userId: null,
+  restaurants: [],
+  currentIndex: 0,
+  matchedRestaurant: null,
+  allMatches: [],
+  connectionStatus: "idle",
+  userCount: 0,
+  partnerSwiping: false,
+};
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   const partnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [state, setState] = useState<SessionState>({
-    sessionId: null,
-    userId: null,
-    restaurants: [],
-    currentIndex: 0,
-    matchedRestaurant: null,
-    connectionStatus: "idle",
-    userCount: 0,
-    partnerSwiping: false,
-  });
+  const [state, setState] = useState<SessionState>(INITIAL_STATE);
 
   const getOrCreateSocket = useCallback(() => {
     if (socketRef.current?.connected) return socketRef.current;
@@ -81,6 +85,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         userId,
         restaurants,
         currentIndex: 0,
+        allMatches: [],
         userCount,
         connectionStatus: "waiting",
       }));
@@ -96,6 +101,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         userId,
         restaurants,
         currentIndex: 0,
+        allMatches: [],
         userCount,
         connectionStatus: userCount >= 2 ? "ready" : "waiting",
       }));
@@ -122,7 +128,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("match", ({ restaurant }: { restaurant: Restaurant }) => {
-      setState((s) => ({ ...s, matchedRestaurant: restaurant }));
+      setState((s) => ({
+        ...s,
+        matchedRestaurant: restaurant,
+        // Accumulate into history (avoid duplicates)
+        allMatches: s.allMatches.some((r) => r.id === restaurant.id)
+          ? s.allMatches
+          : [...s.allMatches, restaurant],
+      }));
     });
 
     socket.on("error", ({ message }: { message: string }) => {
@@ -169,16 +182,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     socketRef.current?.disconnect();
     socketRef.current = null;
     await AsyncStorage.removeItem("tablematch_session");
-    setState({
-      sessionId: null,
-      userId: null,
-      restaurants: [],
-      currentIndex: 0,
-      matchedRestaurant: null,
-      connectionStatus: "idle",
-      userCount: 0,
-      partnerSwiping: false,
-    });
+    setState(INITIAL_STATE);
   }, []);
 
   useEffect(() => {

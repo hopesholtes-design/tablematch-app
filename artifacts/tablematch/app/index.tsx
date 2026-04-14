@@ -5,6 +5,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,9 +20,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useSession, type SessionFilters } from "@/context/SessionContext";
-import { FilterStep } from "@/components/FilterStep";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+const RADIUS_OPTIONS: Array<{ label: string; value: SessionFilters["radiusMiles"] }> = [
+  { label: "1 mi", value: 1 },
+  { label: "5 mi", value: 5 },
+  { label: "10 mi", value: 10 },
+  { label: "25 mi", value: 25 },
+];
+
+const PRICE_OPTIONS: Array<{ label: string; value: SessionFilters["maxPrice"] }> = [
+  { label: "$", value: 1 },
+  { label: "$$", value: 2 },
+  { label: "$$$", value: 3 },
+  { label: "$$$$", value: 4 },
+];
+
+const VIBE_OPTIONS = ["Cozy", "Trendy", "Romantic", "Casual", "Lively"];
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -29,10 +45,14 @@ export default function HomeScreen() {
   const { createSession, joinSession, sessionId, connectionStatus } = useSession();
 
   const [tab, setTab] = useState<"create" | "join">("create");
-  const [step, setStep] = useState<"home" | "filters">("home");
   const [joinCode, setJoinCode] = useState("");
   const [locating, setLocating] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Filter state (inline on New Session tab)
+  const [radius, setRadius] = useState<SessionFilters["radiusMiles"]>(5);
+  const [maxPrice, setMaxPrice] = useState<SessionFilters["maxPrice"]>(3);
+  const [vibes, setVibes] = useState<string[]>([]);
 
   // Navigate to swipe screen when both users connected
   useEffect(() => {
@@ -41,8 +61,17 @@ export default function HomeScreen() {
     }
   }, [connectionStatus]);
 
-  const handleCreate = async (filters: SessionFilters) => {
+  const toggleVibe = (vibe: string) => {
+    setVibes((prev) => {
+      if (prev.includes(vibe)) return prev.filter((v) => v !== vibe);
+      if (prev.length >= 2) return [...prev.slice(1), vibe];
+      return [...prev, vibe];
+    });
+  };
+
+  const handleCreate = async () => {
     setLocating(true);
+    const filters: SessionFilters = { radiusMiles: radius, maxPrice, vibes };
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -76,17 +105,7 @@ export default function HomeScreen() {
   };
 
   const isConnecting = connectionStatus === "connecting";
-
-  // Filter step
-  if (step === "filters") {
-    return (
-      <FilterStep
-        onConfirm={(filters) => handleCreate(filters)}
-        onBack={() => setStep("home")}
-        loading={locating || isConnecting}
-      />
-    );
-  }
+  const isBusy = locating || isConnecting;
 
   // Waiting screen after session creation
   if (connectionStatus === "waiting" && sessionId) {
@@ -143,11 +162,15 @@ export default function HomeScreen() {
         style={styles.gradientBg}
       />
 
-      <View style={[styles.content, {
-        paddingTop: insets.top + (Platform.OS === "web" ? 67 : 24),
-        paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 24),
-      }]}>
-
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, {
+          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 24),
+          paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 24) + 16,
+        }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={[styles.logoContainer, { backgroundColor: "#FF6B6B" }]}>
@@ -181,17 +204,104 @@ export default function HomeScreen() {
 
         {tab === "create" ? (
           <View style={styles.panel}>
-            <Text style={[styles.panelTitle, { color: colors.foreground }]}>Start swiping</Text>
-            <Text style={[styles.panelDesc, { color: colors.mutedForeground }]}>
-              Create a session and share the code with your partner. We'll find restaurants near you.
-            </Text>
+            {/* Distance */}
+            <View style={styles.filterSection}>
+              <Text style={[styles.filterLabel, { color: colors.foreground }]}>Distance</Text>
+              <View style={styles.pillRow}>
+                {RADIUS_OPTIONS.map((opt) => {
+                  const sel = radius === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.pill, {
+                        backgroundColor: sel ? "#FF6B6B" : colors.secondary,
+                        borderColor: sel ? "#FF6B6B" : colors.border,
+                      }]}
+                      onPress={() => setRadius(opt.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, { color: sel ? "#fff" : colors.foreground }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Price */}
+            <View style={styles.filterSection}>
+              <Text style={[styles.filterLabel, { color: colors.foreground }]}>Price</Text>
+              <View style={styles.pillRow}>
+                {PRICE_OPTIONS.map((opt) => {
+                  const active = opt.value <= maxPrice;
+                  const sel = opt.value === maxPrice;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.pill, {
+                        backgroundColor: sel ? "#FF6B6B" : active ? "#FF6B6B18" : colors.secondary,
+                        borderColor: sel ? "#FF6B6B" : active ? "#FF6B6B66" : colors.border,
+                      }]}
+                      onPress={() => setMaxPrice(opt.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, {
+                        color: sel ? "#fff" : active ? "#FF6B6B" : colors.mutedForeground,
+                      }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={[styles.filterHint, { color: colors.mutedForeground }]}>
+                Up to {PRICE_OPTIONS.find((o) => o.value === maxPrice)?.label} — cheaper options included
+              </Text>
+            </View>
+
+            {/* Vibe */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterLabelRow}>
+                <Text style={[styles.filterLabel, { color: colors.foreground }]}>Vibe</Text>
+                <Text style={[styles.filterHint, { color: colors.mutedForeground }]}>pick up to 2</Text>
+              </View>
+              <View style={styles.vibeRow}>
+                {VIBE_OPTIONS.map((vibe) => {
+                  const sel = vibes.includes(vibe);
+                  return (
+                    <TouchableOpacity
+                      key={vibe}
+                      style={[styles.pill, {
+                        backgroundColor: sel ? "#FF6B6B" : colors.secondary,
+                        borderColor: sel ? "#FF6B6B" : colors.border,
+                      }]}
+                      onPress={() => toggleVibe(vibe)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, { color: sel ? "#fff" : colors.foreground }]}>
+                        {vibe}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: "#FF6B6B" }]}
-              onPress={() => setStep("filters")}
+              style={[styles.primaryButton, { backgroundColor: "#FF6B6B" }, isBusy && { opacity: 0.7 }]}
+              onPress={handleCreate}
+              disabled={isBusy}
               activeOpacity={0.85}
             >
-              <Ionicons name="options-outline" size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>Set Filters & Search</Text>
+              {isBusy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="heart" size={20} color="#fff" />
+                  <Text style={styles.primaryButtonText}>Start Swiping</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         ) : (
@@ -237,7 +347,7 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -253,36 +363,38 @@ const styles = StyleSheet.create({
     right: 0,
     height: SCREEN_HEIGHT * 0.5,
   },
-  content: {
+  scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 24,
-    gap: 24,
+    gap: 20,
   },
   header: {
     alignItems: "center",
     gap: 8,
-    marginTop: 12,
+    marginTop: 4,
   },
   logoContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#FF6B6B",
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowRadius: 12,
     elevation: 8,
   },
   appName: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.5,
   },
   tagline: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },
@@ -303,7 +415,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   panel: {
-    gap: 12,
+    gap: 16,
   },
   panelTitle: {
     fontSize: 20,
@@ -314,6 +426,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     lineHeight: 20,
+  },
+  filterSection: {
+    gap: 8,
+  },
+  filterLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
+  },
+  filterHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  pillRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  vibeRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 50,
+    borderWidth: 1.5,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
   },
   primaryButton: {
     flexDirection: "row",
