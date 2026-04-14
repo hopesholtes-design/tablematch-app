@@ -1,7 +1,7 @@
 import { Server as SocketServer } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { logger } from "../lib/logger";
-import { fetchRestaurants } from "./restaurants";
+import { fetchRestaurants, type RestaurantFilters } from "./restaurants";
 
 interface Restaurant {
   id: string;
@@ -57,11 +57,12 @@ export function initSocket(httpServer: HttpServer) {
     logger.info({ socketId: socket.id }, "Socket connected");
 
     // Create a new session
-    socket.on("create_session", async ({ lat, lng }: { lat: number; lng: number }) => {
+    socket.on("create_session", async ({ lat, lng, filters }: { lat: number; lng: number; filters?: RestaurantFilters }) => {
       const sessionId = generateId();
       const userId = generateId();
 
-      const restaurants = await fetchRestaurants(lat, lng, sessionId);
+      const resolvedFilters: RestaurantFilters = filters ?? { radiusMiles: 5, maxPrice: 4, vibes: [] };
+      const restaurants = await fetchRestaurants(lat, lng, sessionId, resolvedFilters);
 
       const session: Session = {
         sessionId,

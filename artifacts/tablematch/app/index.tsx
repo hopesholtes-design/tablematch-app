@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Clipboard as RNClipboard,
   Dimensions,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,7 +18,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-import { useSession } from "@/context/SessionContext";
+import { useSession, type SessionFilters } from "@/context/SessionContext";
+import { FilterStep } from "@/components/FilterStep";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const { createSession, joinSession, sessionId, connectionStatus } = useSession();
 
   const [tab, setTab] = useState<"create" | "join">("create");
+  const [step, setStep] = useState<"home" | "filters">("home");
   const [joinCode, setJoinCode] = useState("");
   const [locating, setLocating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -39,20 +41,18 @@ export default function HomeScreen() {
     }
   }, [connectionStatus]);
 
-  const handleCreate = async () => {
+  const handleCreate = async (filters: SessionFilters) => {
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        // Use default location (SF) if permission denied
-        createSession(37.7749, -122.4194);
+        createSession(37.7749, -122.4194, filters);
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      createSession(loc.coords.latitude, loc.coords.longitude);
+      createSession(loc.coords.latitude, loc.coords.longitude, filters);
     } catch {
-      // Fallback
-      createSession(37.7749, -122.4194);
+      createSession(37.7749, -122.4194, filters);
     } finally {
       setLocating(false);
     }
@@ -77,7 +77,18 @@ export default function HomeScreen() {
 
   const isConnecting = connectionStatus === "connecting";
 
-  // Show waiting screen after session creation
+  // Filter step
+  if (step === "filters") {
+    return (
+      <FilterStep
+        onConfirm={(filters) => handleCreate(filters)}
+        onBack={() => setStep("home")}
+        loading={locating || isConnecting}
+      />
+    );
+  }
+
+  // Waiting screen after session creation
   if (connectionStatus === "waiting" && sessionId) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -85,7 +96,10 @@ export default function HomeScreen() {
           colors={["#FF6B6B22", "#FF8E5322", "#FF6B6B00"]}
           style={styles.gradientBg}
         />
-        <View style={[styles.waitingContent, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0), paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) }]}>
+        <View style={[styles.waitingContent, {
+          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0),
+          paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0),
+        }]}>
           <View style={styles.waitingIcon}>
             <Ionicons name="people-outline" size={56} color={colors.primary} />
           </View>
@@ -113,11 +127,7 @@ export default function HomeScreen() {
             {copied ? "Copied!" : "Tap to copy"}
           </Text>
 
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            style={{ marginTop: 32 }}
-          />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
         </View>
       </View>
     );
@@ -176,19 +186,12 @@ export default function HomeScreen() {
               Create a session and share the code with your partner. We'll find restaurants near you.
             </Text>
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: "#FF6B6B" }, (locating || isConnecting) && { opacity: 0.7 }]}
-              onPress={handleCreate}
-              disabled={locating || isConnecting}
+              style={[styles.primaryButton, { backgroundColor: "#FF6B6B" }]}
+              onPress={() => setStep("filters")}
               activeOpacity={0.85}
             >
-              {locating || isConnecting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="location" size={20} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Find Restaurants Nearby</Text>
-                </>
-              )}
+              <Ionicons name="options-outline" size={20} color="#fff" />
+              <Text style={styles.primaryButtonText}>Set Filters & Search</Text>
             </TouchableOpacity>
           </View>
         ) : (

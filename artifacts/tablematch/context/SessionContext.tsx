@@ -13,6 +13,12 @@ export interface Restaurant {
   mapsLink: string;
 }
 
+export interface SessionFilters {
+  radiusMiles: 1 | 5 | 10 | 25;
+  maxPrice: 1 | 2 | 3 | 4;
+  vibes: string[];
+}
+
 type ConnectionStatus = "idle" | "connecting" | "waiting" | "ready" | "disconnected";
 
 interface SessionState {
@@ -27,7 +33,7 @@ interface SessionState {
 }
 
 interface SessionContextValue extends SessionState {
-  createSession: (lat: number, lng: number) => void;
+  createSession: (lat: number, lng: number, filters: SessionFilters) => void;
   joinSession: (sessionId: string) => void;
   swipe: (restaurantId: string, liked: boolean) => void;
   dismissMatch: () => void;
@@ -132,10 +138,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return socket;
   }, []);
 
-  const createSession = useCallback((lat: number, lng: number) => {
+  const createSession = useCallback((lat: number, lng: number, filters: SessionFilters) => {
     setState((s) => ({ ...s, connectionStatus: "connecting" }));
     const socket = getOrCreateSocket();
-    socket.emit("create_session", { lat, lng });
+    socket.emit("create_session", { lat, lng, filters });
   }, [getOrCreateSocket]);
 
   const joinSession = useCallback((sessionId: string) => {
