@@ -31,6 +31,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
-app.use("/admin", adminRouter);
+app.use("/api/admin", adminRouter);
 
 export default app;
