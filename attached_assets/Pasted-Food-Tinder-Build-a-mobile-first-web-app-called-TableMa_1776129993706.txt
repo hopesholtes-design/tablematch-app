@@ -1,0 +1,128 @@
+Food Tinder 
+
+Build a mobile-first web app called TableMatch (Tinder for restaurant date nights).
+
+Goal:
+Two users join a shared session, swipe through nearby restaurants, and get an instant match the moment both users like the same restaurant.
+
+Stack:
+	•	Frontend: React (Vite)
+	•	Backend: Node + Express
+	•	Realtime: Socket.io
+	•	Keep everything simple and runnable in Replit
+
+⸻
+
+Core Requirements
+
+1) Sessions
+	•	User can:
+	•	Create session → generate sessionId + shareable link
+	•	Join session via link
+	•	Limit 2 users per session
+	•	Assign random userId (no auth)
+
+⸻
+
+2) Location + Restaurants (REQUIRED)
+	•	Use browser geolocation API to get lat/lng
+	•	Fetch nearby restaurants using:
+	•	Primary: Google Places API (Nearby Search)
+	•	Fallback: Yelp Fusion API
+	•	Cache results per session
+
+Restaurant object must include:
+	•	id
+	•	name
+	•	photo
+	•	cuisine/type
+	•	rating
+	•	price (if available)
+	•	address
+	•	maps link
+
+⸻
+
+3) Restaurant Feed Logic (IMPORTANT)
+	•	Both users share the SAME restaurant pool
+	•	Shuffle order per user (slight randomization)
+	•	Do NOT fully randomize independently (ensure overlap for matches)
+	•	Optional: when User A likes a restaurant, slightly prioritize it sooner in User B’s queue
+
+⸻
+
+4) Swipe UI
+	•	One card at a time
+	•	Swipe right = like
+	•	Swipe left = pass
+	•	Also include buttons (mobile fallback)
+	•	Show:
+	•	image
+	•	name
+	•	cuisine
+	•	rating
+	•	price
+
+⸻
+
+5) Matching Logic (CRITICAL)
+	•	Store swipes as:
+{ sessionId, userId, restaurantId, liked }
+	•	On every RIGHT swipe:
+	•	Check if other user already liked same restaurant
+	•	If YES:
+→ trigger instant match event via socket
+→ store in matches[]
+→ prevent duplicate matches
+
+⸻
+
+6) Match Experience (REAL-TIME)
+	•	Immediately interrupt both users with match screen
+	•	Show:
+	•	restaurant name + image
+	•	“You both liked this”
+	•	Actions:
+	•	“Open in Maps”
+	•	“Keep Swiping”
+	•	(optional) “Lock it in”
+
+⸻
+
+7) Realtime UX
+	•	Show connection state:
+	•	“Waiting for second user”
+	•	“Both users connected”
+	•	Show subtle partner activity:
+	•	“Other user is swiping…”
+
+⸻
+
+8) Data Model (simple in-memory or lightweight DB)
+	•	sessions: { sessionId, users[], restaurants[] }
+	•	swipes: []
+	•	matches: []
+
+⸻
+
+9) Environment Setup
+	•	Use .env for API keys:
+	•	GOOGLE_PLACES_API_KEY
+	•	or YELP_API_KEY
+	•	Include clear instructions for adding keys
+
+⸻
+
+10) Constraints
+	•	MVP only, no overengineering
+	•	Clean UI, mobile-first
+	•	Handle end-of-list gracefully
+	•	If API fails → fallback to mock restaurant data
+
+⸻
+
+Output
+	•	Fully working Replit app
+	•	Clear run instructions
+	•	Where to add API keys
+	•	Simple file structure

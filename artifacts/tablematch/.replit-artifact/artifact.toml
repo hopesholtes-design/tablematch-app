@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "TableMatch"
+version = "1.0.0"
+id = "artifacts/tablematch"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 18363
+
+[services.development]
+run = "pnpm --filter @workspace/tablematch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tablematch", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/tablematch", "run", "serve" ]
+
+[services.env]
+PORT = "18363"
+BASE_PATH = "/"

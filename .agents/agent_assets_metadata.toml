@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "hYcFGPk8ESPbL53HMs9eF"
+uri = "file://artifacts/tablematch/assets/images/icon.png"
+type = "image"
+title = "tablematch app icon"
+
+[[generated]]
+id = "_mGHM4hIm4kNXfuMMdgmF"
+uri = "file://artifacts/tablematch/assets/images/restaurant-placeholder.png"
+type = "image"
+title = "restaurant placeholder"
