@@ -1,0 +1,105 @@
+Enhance existing “Table Match” app. Keep all current functionality unchanged.
+
+Add backend analytics (SQLite) and a restaurant curation/ranking layer.
+	1.	Analytics (event tracking)
+
+Implement SQLite database.
+
+Create table “events” with fields:
+	•	id (primary key)
+	•	session_id
+	•	user_id (nullable)
+	•	event_type (string)
+	•	metadata (JSON)
+	•	created_at (timestamp)
+
+Create helper function logEvent(sessionId, eventType, metadata).
+
+Track the following events:
+	•	session_started
+	•	filters_set
+	•	invite_sent
+	•	second_user_joined
+	•	swipe_left
+	•	swipe_right
+	•	match_created
+	•	session_abandoned
+
+Call logEvent at all key interaction points.
+	2.	Admin dashboard
+
+Add route “/admin” with password protection via environment variable.
+
+Display:
+	•	total sessions
+	•	percent of sessions with 2 users
+	•	matches per session
+	•	average time to match
+
+Build funnel:
+session_started → filters_set → second_user_joined → first swipe → match_created
+
+Also display:
+	•	top matched restaurants
+	•	most selected vibes
+
+	3.	Restaurant fetching
+
+Use Google Places API.
+
+Inputs (already exist):
+	•	latitude/longitude
+	•	radius
+	•	price level
+	•	vibe selections
+
+	4.	Filtering
+
+Before ranking, only include restaurants where:
+	•	rating >= 4.2
+	•	review_count >= 75
+	•	business_status is operational
+
+	5.	Scoring function
+
+Score each restaurant using:
+rating weighted at 40 percent
+log(review_count) weighted at 25 percent
+distance_score weighted at 15 percent (inverse of distance)
+vibe_score weighted at 20 percent (keyword match count)
+	6.	Vibe mapping (soft ranking boost)
+
+Map vibes to keywords:
+
+Cozy → cozy, intimate, cafe, wine bar
+Trendy → trendy, modern, popular
+Romantic → romantic, date night, italian, steakhouse
+Casual → casual, quick bite, local
+Lively → bar, brunch, music, busy
+
+Rules:
+	•	combine multiple vibes (union of keywords)
+	•	apply as ranking boost, not a strict filter
+	•	if results are too few, relax vibe weighting only (do not change radius or price filters)
+
+	7.	Deck generation
+
+	•	sort restaurants by score descending
+	•	return top 20 to 30 results
+	•	cache results per session
+
+	8.	Feedback loop
+
+On match_created:
+	•	store restaurant_id in events
+
+Use this to slightly boost ranking of restaurants with higher historical match frequency.
+	9.	Constraints
+
+	•	keep code minimal and readable
+	•	no UI changes except adding /admin
+	•	maintain mobile-first performance
+	•	do not break existing swipe or match flow
+
+Goal:
+Enable visibility into user behavior and continuously improve restaurant quality using real match data.
