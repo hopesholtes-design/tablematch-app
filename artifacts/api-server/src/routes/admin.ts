@@ -21,7 +21,7 @@ function pct(a: number, b: number): string {
   return b > 0 ? ((a / b) * 100).toFixed(0) + "%" : "—";
 }
 
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   const adminPassword = process.env["ADMIN_PASSWORD"];
 
   if (!adminPassword) {
@@ -40,7 +40,7 @@ router.get("/", (req, res) => {
 
   let stats;
   try {
-    stats = getAdminStats();
+    stats = await getAdminStats();
   } catch (err) {
     return res.status(500).send(
       `<html><body style="font-family:monospace;padding:40px"><h2>DB error</h2><pre>${String(err)}</pre></body></html>`,
