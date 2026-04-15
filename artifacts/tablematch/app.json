@@ -14,7 +14,11 @@
       "backgroundColor": "#FAFAF8"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tablematch.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TableMatch uses your location to find nearby restaurants."
+      }
     },
     "android": {},
     "web": {
