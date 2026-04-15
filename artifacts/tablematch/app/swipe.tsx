@@ -83,6 +83,7 @@ export default function SwipeScreen() {
   const visibleCards = restaurants.slice(currentIndex, currentIndex + 3);
   const isEnd = currentIndex >= restaurants.length && restaurants.length > 0;
   const isWaiting = connectionStatus === "waiting" || userCount < 2;
+  const isEmpty = restaurants.length === 0 && !isWaiting;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -128,7 +129,7 @@ export default function SwipeScreen() {
         </View>
       )}
 
-      {/* Cards / End / Waiting area */}
+      {/* Cards / End / Waiting / Empty area */}
       {isEnd ? (
         <EndScreen
           allMatches={allMatches}
@@ -144,6 +145,24 @@ export default function SwipeScreen() {
             <Text style={[styles.stateSubtitle, { color: colors.mutedForeground }]}>
               They need to join with your session code.
             </Text>
+          </View>
+        </View>
+      ) : isEmpty ? (
+        <View style={styles.cardsArea}>
+          <View style={styles.centerState}>
+            <Ionicons name="restaurant-outline" size={48} color={colors.mutedForeground} />
+            <Text style={[styles.stateTitle, { color: colors.foreground }]}>No restaurants found nearby</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.mutedForeground }]}>
+              Try increasing your distance or adjusting your filters.
+            </Text>
+            <TouchableOpacity
+              style={[styles.newSessionBtn, { borderColor: colors.border, backgroundColor: colors.secondary, marginTop: 8 }]}
+              onPress={async () => { await disconnect(); router.replace("/"); }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="options-outline" size={18} color={colors.foreground} />
+              <Text style={[styles.newSessionText, { color: colors.foreground }]}>Adjust Filters</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
