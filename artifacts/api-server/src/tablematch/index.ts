@@ -2,7 +2,7 @@ import { Server as SocketServer } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { logger } from "../lib/logger";
 import { fetchRestaurants, type RestaurantFilters } from "./restaurants";
-import { logEvent } from "./db";
+import { logEvent, saveSession, loadSession, deleteSession } from "./db";
 
 interface Restaurant {
   id: string;
@@ -67,15 +67,29 @@ export function initSocket(httpServer: HttpServer) {
         lng: number;
         filters?: RestaurantFilters;
       }) => {
+        // Input validation
+        const clampedLat = Math.max(-90, Math.min(90, Number(lat)));
+        const clampedLng = Math.max(-180, Math.min(180, Number(lng)));
+        if (isNaN(clampedLat) || isNaN(clampedLng)) {
+          socket.emit("error", { message: "Invalid location coordinates" });
+          return;
+        }
+        const lat_ = clampedLat;
+        const lng_ = clampedLng;
+
         const sessionId = generateId();
         const userId = generateId();
-        const resolvedFilters: RestaurantFilters = filters ?? { radiusMiles: 5, maxPrice: 4, vibes: [] };
+        const resolvedFilters: RestaurantFilters = {
+          radiusMiles: Math.min(50, filters?.radiusMiles ?? 5) as RestaurantFilters["radiusMiles"],
+          maxPrice: filters?.maxPrice ?? 4,
+          vibes: filters?.vibes ?? [],
+        };
 
-        logEvent(sessionId, "session_started", { lat, lng, ...resolvedFilters }, userId);
+        logEvent(sessionId, "session_started", { lat: lat_, lng: lng_, ...resolvedFilters }, userId);
         logEvent(sessionId, "filters_set", { radiusMiles: resolvedFilters.radiusMiles, maxPrice: resolvedFilters.maxPrice, vibes: resolvedFilters.vibes }, userId);
         logEvent(sessionId, "invite_sent", { sessionId }, userId);
 
-        const restaurants = await fetchRestaurants(lat, lng, sessionId, resolvedFilters);
+        const restaurants = await fetchRestaurants(lat_, lng_, sessionId, resolvedFilters);
 
         const session: Session = {
           sessionId,
@@ -88,6 +102,7 @@ export function initSocket(httpServer: HttpServer) {
         };
 
         sessions.set(sessionId, session);
+        saveSession(sessionId, session);
         await socket.join(sessionId);
 
         socket.emit("session_created", {
@@ -103,6 +118,15 @@ export function initSocket(httpServer: HttpServer) {
 
     // ── Join session ───────────────────────────────────────────────────────
     socket.on("join_session", async ({ sessionId }: { sessionId: string }) => {
+      // Rehydrate from DB if evicted from memory
+      if (!sessions.has(sessionId)) {
+        const stored = await loadSession(sessionId) as Session | null;
+        if (stored) {
+          stored.users = []; // clear stale socket refs — users must reconnect
+          sessions.set(sessionId, stored);
+        }
+      }
+
       const session = sessions.get(sessionId);
 
       if (!session) {
@@ -141,6 +165,8 @@ export function initSocket(httpServer: HttpServer) {
         userRestaurants = boosted;
       }
 
+      saveSession(sessionId, session);
+
       socket.emit("session_joined", {
         sessionId,
         userId,
@@ -150,6 +176,49 @@ export function initSocket(httpServer: HttpServer) {
 
       io.to(sessionId).emit("partner_joined", { userCount: session.users.length });
       logger.info({ sessionId, userId }, "User joined session");
+    });
+
+    // ── Rejoin session (reconnect after drop) ──────────────────────────────
+    socket.on("rejoin_session", async ({ sessionId, userId }: { sessionId: string; userId: string }) => {
+      // Try memory first, then DB
+      if (!sessions.has(sessionId)) {
+        const stored = await loadSession(sessionId) as Session | null;
+        if (stored) {
+          stored.users = stored.users.filter((u) => u.userId !== userId);
+          sessions.set(sessionId, stored);
+        }
+      }
+
+      const session = sessions.get(sessionId);
+      if (!session) {
+        socket.emit("rejoin_failed", { reason: "Session not found" });
+        return;
+      }
+
+      // Update or add this user's socket ID
+      const existing = session.users.find((u) => u.userId === userId);
+      if (existing) {
+        existing.socketId = socket.id;
+      } else {
+        if (session.users.length >= 2) {
+          socket.emit("rejoin_failed", { reason: "Session is full" });
+          return;
+        }
+        session.users.push({ userId, socketId: socket.id });
+      }
+
+      await socket.join(sessionId);
+      saveSession(sessionId, session);
+
+      socket.emit("session_joined", {
+        sessionId,
+        userId,
+        restaurants: shuffleForUser(session.restaurants, userId),
+        userCount: session.users.length,
+      });
+
+      io.to(sessionId).emit("partner_joined", { userCount: session.users.length });
+      logger.info({ sessionId, userId }, "User rejoined session");
     });
 
     // ── Swipe ──────────────────────────────────────────────────────────────
@@ -204,6 +273,7 @@ export function initSocket(httpServer: HttpServer) {
                 userId,
               );
 
+              saveSession(sessionId, session);
               io.to(sessionId).emit("match", { restaurant: matchedRestaurant });
               logger.info({ sessionId, restaurantId }, "Match found!");
             }
@@ -234,7 +304,8 @@ export function initSocket(httpServer: HttpServer) {
 
           if (session.users.length === 0) {
             sessions.delete(sessionId);
-            logger.info({ sessionId }, "Session deleted (empty)");
+            // Keep DB record for potential rejoin; it will expire naturally
+            logger.info({ sessionId }, "Session evicted from memory (users=0)");
           }
         }
       }
