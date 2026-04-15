@@ -35,7 +35,13 @@ app.use("/api", router);
 app.use("/api/admin", adminRouter);
 
 app.get("/privacy-policy", (_req, res) => {
-  res.sendFile(path.join(__dirname, "..", "privacy-policy.html"));
+  const filePath = path.join(process.cwd(), "privacy-policy.html");
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error("Privacy policy file not found:", filePath);
+      res.status(404).send("Privacy policy not available");
+    }
+  });
 });
 
 export default app;
