@@ -4,6 +4,7 @@ import {
   Clipboard as RNClipboard,
   Dimensions,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -347,6 +348,13 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
+
+        <TouchableOpacity
+          onPress={() => Linking.openURL(`https://${process.env["EXPO_PUBLIC_DOMAIN"]}/privacy-policy`)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.privacyLink, { color: colors.mutedForeground }]}>Privacy Policy</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -542,5 +550,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     padding: 12,
+  },
+  privacyLink: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    paddingVertical: 8,
   },
 });
