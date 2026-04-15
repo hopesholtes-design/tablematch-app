@@ -35,7 +35,7 @@ app.use("/api", router);
 app.use("/api/admin", adminRouter);
 
 app.get("/privacy-policy", (_req, res) => {
-  res.sendFile(path.join(process.cwd(), "privacy-policy.html"));
+  res.sendFile(path.join(__dirname, "..", "privacy-policy.html"));
 });
 
 export default app;
