@@ -43,7 +43,11 @@ interface SessionContextValue extends SessionState {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-const SOCKET_URL = `https://${process.env["EXPO_PUBLIC_DOMAIN"]}`;
+const _domain = process.env["EXPO_PUBLIC_DOMAIN"];
+if (!_domain) {
+  console.error("[SessionContext] Missing EXPO_PUBLIC_DOMAIN — socket connections will fail");
+}
+const SOCKET_URL = `https://${_domain ?? ""}`;
 
 const INITIAL_STATE: SessionState = {
   sessionId: null,
@@ -138,6 +142,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }));
     });
 
+    socket.on("rejoin_failed", () => {
+      AsyncStorage.removeItem("tablematch_session");
+      setState(INITIAL_STATE);
+    });
+
     socket.on("error", ({ message }: { message: string }) => {
       console.warn("Socket error:", message);
       setState((s) => ({ ...s, connectionStatus: "disconnected" }));
@@ -184,6 +193,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem("tablematch_session");
     setState(INITIAL_STATE);
   }, []);
+
+  // Attempt to rejoin a session if the app was closed mid-session
+  useEffect(() => {
+    AsyncStorage.getItem("tablematch_session").then((raw) => {
+      if (!raw) return;
+      try {
+        const { sessionId, userId } = JSON.parse(raw) as { sessionId: string; userId: string };
+        if (!sessionId || !userId) return;
+        setState((s) => ({ ...s, connectionStatus: "connecting" }));
+        const socket = getOrCreateSocket();
+        socket.emit("rejoin_session", { sessionId, userId });
+      } catch {
+        AsyncStorage.removeItem("tablematch_session");
+      }
+    });
+  }, [getOrCreateSocket]);
 
   useEffect(() => {
     return () => {
