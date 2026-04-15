@@ -129,7 +129,7 @@ export async function fetchRestaurants(
     return restaurantCache.get(cacheKey)!;
   }
 
-  const matchBoostMap = getMatchBoostMap();
+  const matchBoostMap = await getMatchBoostMap();
   const radiusMeters = Math.round(filters.radiusMiles * 1609);
   const vibeKeywords = filters.vibes.flatMap((v) => VIBE_KEYWORDS[v] ?? []);
   const keyword = vibeKeywords.length > 0 ? vibeKeywords.slice(0, 3).join(" ") : undefined;
