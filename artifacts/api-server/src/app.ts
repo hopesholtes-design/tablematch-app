@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "path";
 import router from "./routes";
 import adminRouter from "./routes/admin";
 import { logger } from "./lib/logger";
@@ -32,5 +33,9 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 app.use("/api/admin", adminRouter);
+
+app.get("/privacy-policy", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "privacy-policy.html"));
+});
 
 export default app;
